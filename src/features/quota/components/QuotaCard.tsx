@@ -12,6 +12,7 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import type { ClaudeQuotaState, ResolvedTheme } from '@/types';
 import { resolveQuotaErrorMessage } from '@/utils/quota';
 import { getQuotaDisplayName } from '@/utils/quota/identity';
+import { accountIdentity, useAccountNames } from '@/features/atelier/accountNames';
 import {
   getAuthFileIcon,
   getThemeSurfaceIconBackground,
@@ -65,7 +66,8 @@ export function QuotaCard(props: QuotaCardProps) {
   const file = entry.file;
   const retainedClaudeUsage =
     entry.type === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
-  const displayName = getQuotaDisplayName(file);
+  const friendlyName = useAccountNames((state) => state.names[accountIdentity(file)]);
+  const displayName = friendlyName || getQuotaDisplayName(file);
 
   // Capture the entrance delay only at mount, without a render-time ref read.
   const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);

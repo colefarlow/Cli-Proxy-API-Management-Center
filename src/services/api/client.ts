@@ -15,6 +15,7 @@ import {
 } from '@/utils/constants';
 import { computeApiUrl } from '@/utils/connection';
 import { parseApiErrorResponse } from './apiError';
+import { nativeAdapter } from './nativeAdapter';
 
 class ApiClient {
   private instance: AxiosInstance;
@@ -24,6 +25,7 @@ class ApiClient {
 
   constructor(private readonly emitEvents: () => boolean = () => true) {
     this.instance = axios.create({
+      ...(typeof window !== 'undefined' && window.proxyAtelier ? { adapter: nativeAdapter } : {}),
       timeout: REQUEST_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',

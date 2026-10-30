@@ -3,6 +3,7 @@
  */
 
 import axios from 'axios';
+import { nativeAdapter } from './nativeAdapter';
 import { normalizeModelList } from '@/utils/models';
 import { normalizeApiBase } from '@/utils/connection';
 import { apiCallApi, getApiCallErrorMessage } from './apiCall';
@@ -98,6 +99,7 @@ export const modelsApi = {
     }
 
     const response = await axios.get(endpoint, {
+      ...(typeof window !== 'undefined' && window.proxyAtelier ? { adapter: nativeAdapter } : {}),
       headers: Object.keys(resolvedHeaders).length ? resolvedHeaders : undefined,
     });
     const payload = response.data?.data ?? response.data?.models ?? response.data;

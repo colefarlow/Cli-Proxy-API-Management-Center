@@ -30,6 +30,8 @@ import {
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
+import { accountIdentity, useAccountNames } from '@/features/atelier/accountNames';
+import { RenameAccountButton } from '@/features/atelier/RenameAccountButton';
 import { resolveAuthFileQuotaType } from '@/features/authFiles/logic';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
@@ -115,6 +117,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   // Lead with account identity and use the file name as secondary text.
   const identity = deriveAuthFileIdentity(file);
+  const friendlyName = useAccountNames((state) => state.names[accountIdentity(file)]);
   const siwcExpires = file.siwcExpiresAt
     ? formatDateTimeValue(file.siwcExpiresAt, i18n.language)
     : '';
@@ -160,11 +163,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
           </span>
           <span
             className={`${styles.account} ${identity.kind === 'fileName' ? styles.accountMono : ''}`}
-            title={identity.primary}
+            title={friendlyName || identity.primary}
           >
-            {identity.primary}
+            {friendlyName || identity.primary}
           </span>
         </h3>
+        {typeof window !== 'undefined' && window.proxyAtelier && (
+          <RenameAccountButton file={file} />
+        )}
         {isRuntimeOnly && (
           <span className={styles.runtimeLabel}>{t('auth_files.type_virtual')}</span>
         )}

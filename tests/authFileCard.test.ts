@@ -18,7 +18,7 @@ describe('auth file card presentation contract', () => {
     expect(source).not.toContain('getAuthFileIcon');
     expect(source).not.toContain('stateBadge');
     expect(source).toContain('<h3');
-    expect(source).toContain('{identity.primary}');
+    expect(source).toContain('{friendlyName || identity.primary}');
     expect(source).toContain('{identity.secondary}');
   });
 
