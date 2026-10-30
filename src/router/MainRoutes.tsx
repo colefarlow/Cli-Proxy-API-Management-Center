@@ -1,6 +1,7 @@
 import { Navigate, useRoutes, type Location } from 'react-router-dom';
 import { AtelierDashboard as DashboardPage } from '@/features/atelier/AtelierDashboard';
 import { AtelierSetup } from '@/features/atelier/AtelierSetup';
+import { AtelierAdvanced } from '@/features/atelier/AtelierAdvanced';
 import { DashboardPage as OriginalDashboardPage } from '@/features/dashboard/DashboardPage';
 import { useInterfaceStore } from '@/features/atelier/interfaceStore';
 import { ProvidersWorkbenchPage } from '@/features/providers/ProvidersWorkbenchPage';
@@ -22,6 +23,7 @@ const createMainRoutes = (supportsPlugin: boolean, original: boolean) => [
   { path: '/', element: original ? <OriginalDashboardPage /> : <DashboardPage /> },
   { path: '/dashboard', element: original ? <OriginalDashboardPage /> : <DashboardPage /> },
   { path: '/setup', element: original ? <Navigate to="/config" replace /> : <AtelierSetup /> },
+  { path: '/advanced', element: original ? <Navigate to="/" replace /> : <AtelierAdvanced /> },
   { path: '/settings', element: <Navigate to="/config" replace /> },
   { path: '/api-keys', element: <Navigate to="/config" replace /> },
   { path: '/quick-start', element: <ProvidersWorkbenchPage fixedBrand="apikeyFun" /> },

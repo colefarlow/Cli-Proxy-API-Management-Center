@@ -4,9 +4,9 @@ A personal desktop fork of [CLI Proxy API Management Center](https://github.com/
 
 ## Use
 
-Open **Proxy Atelier** from `~/Applications`. Choose MacBook or LinuxBox2 in the header to inspect that proxy. This changes only the management connection; it does not switch T3 providers or move active conversations. The navigation rail retains Accounts, Quota, Connections, Routing, Providers, Configuration, Activity and System. **Optimizations** reports the live settings discussed in the supplied video transcript, including recent health of the separately installed reset-priority helper.
+Open **Proxy Atelier** from `~/Applications`. Choose MacBook or LinuxBox2 in the header to inspect that proxy. This changes only the management connection; it does not switch T3 providers or move active conversations. The daily navigation is Dashboard, Accounts and Advanced. Advanced links to Quota, Connections, Routing, Providers, Configuration, Activity, System and the original dashboard. **Optimizations** reports the live settings discussed in the supplied video transcript, including recent health of the separately installed reset-priority helper.
 
-The redesigned overview uses real account counters and provider quota readings. Missing data is shown as unavailable. Weekly capacity is an unweighted average across the active Claude accounts, not a combined token budget. Account rows are ordered by current proxy priority. Quotas refresh every five minutes while the app is open; the priority helper runs independently every fifteen minutes. Closing the window or quitting this app does not stop the proxy or helper.
+The redesigned overview puts provider quota readings and relative reset countdowns beside account names. Exact reset timestamps remain available on hover, and request activity is collapsed until opened. Missing data is shown as unavailable. Weekly capacity is an unweighted average across the active Claude accounts, not a combined token budget. Account rows are ordered by current proxy priority. Quotas refresh every five minutes while the app is open; the priority helper runs independently every fifteen minutes. Closing the window or quitting this app does not stop the proxy or helper.
 
 ## Authentication
 
@@ -41,7 +41,7 @@ MIT; upstream copyright and license are retained in the repository and app. Upst
 
 Click the pencil beside an account name in the overview or Accounts screen. Names are stored as local application preferences, keyed by provider plus account email (or filename when an email is unavailable), so the same subscription uses the same label in both host views. Clearing the field restores its default label. Provider tokens, credential filenames, routing priorities and sign-ins are unchanged. Labels also appear on the original account and quota cards.
 
-**Original controls** in the footer opens the untouched upstream dashboard and navigation inside this app. Refresh All, language, theme, logout, Quick Start, provider editors, credential upload/download/refresh/enable/disable, OAuth, routing, detailed quota/reset actions, configuration, plugins, logs and system controls retain their original implementations. **Back to Atelier** returns to the redesigned view. Native View menu shortcuts: ⌘1 returns to Atelier, ⌘2 opens Original Controls, ⌘R refreshes observations.
+**Open original dashboard** under Advanced opens the untouched upstream dashboard and navigation inside this app. Refresh All, language, theme, logout, Quick Start, provider editors, credential upload/download/refresh/enable/disable, OAuth, routing, detailed quota/reset actions, configuration, plugins, logs and system controls retain their original implementations. **Back to Atelier** returns to the redesigned view. Native View menu shortcuts: ⌘1 returns to Atelier, ⌘2 opens Original Controls, ⌘R refreshes observations.
 
 The original `MainLayout.tsx` and `DashboardPage.tsx` are unchanged from the upstream base. The native Axios adapter preserves status/error handling, JSON, multipart uploads and binary downloads. Model discovery uses the same native channel. No destructive management action is executed during verification.
 
@@ -53,3 +53,7 @@ The original `MainLayout.tsx` and `DashboardPage.tsx` are unchanged from the ups
 - Live UI checks covered both host connections, account quotas, 12 optimization checks, the original dashboard/Refresh All/model discovery, and saving account labels in native preferences.
 - Before/after probes on MacBook and LinuxBox2 confirmed identical proxy engine hashes and process IDs, four active accounts, and the configured routing/transport settings. No proxy restart, engine replacement, T3 provider switch, account toggle or token copy was performed.
 - The fork workflows use the required Linux self-hosted runner labels. No new runner is registered and no GitHub release or proxy deployment is triggered by the desktop installation.
+
+## Daily-view simplification — 2026-10-30
+
+The daily sidebar now has three labeled destinations. The large account count and repeated status graphic are replaced by a quota-first account table and one Ready / Needs attention link to the full checks. The host selector is labeled Viewing, with a management-only explanation. Supporting labels are larger; the ink, muted, subtle and accent text colors measure 15.91:1, 5.95:1, 4.83:1 and 7.66:1 against white. Reset countdowns update locally and say Checking reset after the observed time passes, rather than claiming refreshed quota. The complete original controls and all existing routes remain available through Advanced.

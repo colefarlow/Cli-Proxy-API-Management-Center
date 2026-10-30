@@ -1,25 +1,32 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainRoutes } from '@/router/MainRoutes';
 import { useAuthStore } from '@/stores';
+import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useAtelierSnapshot } from './useAtelierSnapshot';
 import { Glyph } from './Glyph';
 import { SnapshotContext } from './AtelierContext';
-import { useInterfaceStore } from './interfaceStore';
-import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { recommendationChecks } from './atelierData';
+import { navigationSection, setupHealth } from './dailyView';
 import './atelier.scss';
 
 const destinations = [
   ['/', 'home', 'dashboard'],
   ['/auth-files', 'accounts', 'accounts'],
-  ['/quota', 'layers', 'quota'],
-  ['/oauth', 'connect', 'connect'],
-  ['/routing', 'routing', 'routing'],
-  ['/ai-providers', 'layers', 'providers'],
-  ['/setup', 'shield', 'setup'],
-  ['/config', 'settings', 'configuration'],
+  ['/advanced', 'settings', 'advanced'],
 ] as const;
+const routeTitles: Record<string, string> = {
+  '/quota': 'quota',
+  '/oauth': 'connect',
+  '/routing': 'routing',
+  '/ai-providers': 'providers',
+  '/setup': 'setup',
+  '/config': 'configuration',
+  '/logs': 'activity',
+  '/system': 'system',
+  '/advanced': 'advanced',
+};
 
 export function AtelierLayout() {
   const { t } = useTranslation();
@@ -28,9 +35,13 @@ export function AtelierLayout() {
   const snapshot = useAtelierSnapshot();
   const [query, setQuery] = useState('');
   const version = useAuthStore((state) => state.serverVersion);
-  const title =
-    destinations.find(([path]) => path === location.pathname)?.[2] ??
-    (location.pathname === '/logs' ? 'activity' : 'system');
+  const section = navigationSection(location.pathname);
+  const title = routeTitles[location.pathname] ?? section;
+  const health = setupHealth(
+    recommendationChecks(snapshot.config, snapshot.accounts, snapshot.helper),
+    Boolean(snapshot.observedAt),
+    snapshot.error
+  );
   const refresh = snapshot.refresh;
   useEffect(() => {
     const handler = () => {
@@ -43,42 +54,34 @@ export function AtelierLayout() {
     <SnapshotContext.Provider value={{ ...snapshot, query }}>
       <div className="atelier-app">
         <aside className="atelier-rail" aria-label={t('atelier.navigation')}>
-          <NavLink to="/" className="atelier-mark" title="Proxy Atelier" aria-label="Proxy Atelier">
-            <svg width="29" height="32" viewBox="0 0 29 32" aria-hidden="true">
-              <path d="m3 25 10-20h5L8 25Zm9 0L22 5l4 8-6 12Z" fill="#b9e8bc" />
-            </svg>
-          </NavLink>
+          <Link to="/" className="atelier-brand" aria-label="Proxy Atelier">
+            <span className="atelier-mark">
+              <svg width="25" height="28" viewBox="0 0 29 32" aria-hidden="true">
+                <path d="m3 25 10-20h5L8 25Zm9 0L22 5l4 8-6 12Z" fill="#b9e8bc" />
+              </svg>
+            </span>
+            <span>
+              Proxy
+              <br />
+              Atelier
+            </span>
+          </Link>
           <nav>
             {destinations.map(([path, icon, label]) => (
-              <NavLink
-                end={path === '/'}
+              <Link
                 key={path}
                 to={path}
-                title={t(`atelier.${label}`)}
-                aria-label={t(`atelier.${label}`)}
-                className={({ isActive }) => `atelier-nav ${isActive ? 'selected' : ''}`}
+                className={`atelier-nav ${section === label ? 'selected' : ''}`}
+                aria-current={section === label ? 'page' : undefined}
               >
-                <Glyph name={icon} />
-              </NavLink>
+                <Glyph name={icon} size={19} />
+                <span>{t(`atelier.${label}`)}</span>
+              </Link>
             ))}
           </nav>
           <div className="atelier-rail-bottom">
-            <NavLink
-              to="/logs"
-              className="atelier-nav"
-              title={t('atelier.activity')}
-              aria-label={t('atelier.activity')}
-            >
-              <Glyph name="chart" />
-            </NavLink>
-            <NavLink
-              to="/system"
-              className="atelier-nav"
-              title={t('atelier.system')}
-              aria-label={t('atelier.system')}
-            >
-              <Glyph name="system" />
-            </NavLink>
+            <span className="atelier-sidebar-note">{t('atelier.desktop_control')}</span>
+            <span>{version ?? 'CLIProxyAPI'}</span>
           </div>
         </aside>
         <div className="atelier-workspace">
@@ -94,25 +97,32 @@ export function AtelierLayout() {
                   if (location.pathname !== '/') void navigate('/');
                 }}
               />
-              <Glyph name="search" size={20} />
+              <Glyph name="search" size={18} />
             </div>
             <div className="atelier-header-right">
-              <span className={`atelier-connection ${snapshot.error ? 'offline' : ''}`}>
-                <i />
-                {t(snapshot.error ? 'atelier.unreachable' : 'atelier.connected')}
-              </span>
+              <Link
+                to="/setup"
+                className={`atelier-health ${health}`}
+                title={t('atelier.health_details')}
+              >
+                <Glyph name={health === 'ready' ? 'check' : 'shield'} size={17} />
+                {t(`atelier.health_${health}`)}
+              </Link>
               {window.proxyAtelier && (
-                <select
-                  aria-label={t('atelier.select_host')}
-                  value={window.proxyAtelier.host}
-                  onChange={(event) => window.proxyAtelier?.switchHost(event.target.value)}
-                >
-                  <option value="macbook">MacBook</option>
-                  <option value="linuxbox2">LinuxBox2</option>
-                </select>
+                <label className="atelier-host-picker" title={t('atelier.viewing_help')}>
+                  <span>{t('atelier.viewing')}</span>
+                  <select
+                    aria-label={t('atelier.select_host')}
+                    value={window.proxyAtelier.host}
+                    onChange={(event) => window.proxyAtelier?.switchHost(event.target.value)}
+                  >
+                    <option value="macbook">MacBook</option>
+                    <option value="linuxbox2">LinuxBox2</option>
+                  </select>
+                </label>
               )}
               <button
-                className={`atelier-icon-button ${snapshot.loading ? 'refreshing' : ''}`}
+                className="atelier-icon-button"
                 disabled={snapshot.loading}
                 onClick={() => {
                   void Promise.allSettled([snapshot.refresh(), triggerHeaderRefresh()]);
@@ -120,11 +130,11 @@ export function AtelierLayout() {
                 title={t('atelier.refresh')}
                 aria-label={t('atelier.refresh')}
               >
-                <Glyph name="refresh" size={19} />
+                <Glyph name="refresh" size={18} />
               </button>
             </div>
           </header>
-          <main className="atelier-main content" data-account-search={query.toLowerCase()}>
+          <main className="atelier-main content">
             {snapshot.error && (
               <div role="alert" className="atelier-warning">
                 {t('atelier.connection_error')}
@@ -133,16 +143,8 @@ export function AtelierLayout() {
             <MainRoutes />
           </main>
           <footer className="atelier-footer">
-            <button
-              className="atelier-original-button"
-              onClick={() => useInterfaceStore.getState().setOriginal(true)}
-            >
-              {t('atelier.original_controls')}
-            </button>
-            <span>
-              PROXY ATELIER <em>/</em> {version ?? 'CLIProxyAPI'}
-            </span>
             <span>{t('atelier.independent')}</span>
+            <span>{t('atelier.viewing_help')}</span>
           </footer>
         </div>
       </div>

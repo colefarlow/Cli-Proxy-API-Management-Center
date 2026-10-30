@@ -1,47 +1,66 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Glyph } from './Glyph';
 import { useAtelier } from './AtelierContext';
 import { accountIdentity, useAccountNames } from './accountNames';
 import { RenameAccountButton } from './RenameAccountButton';
-import { recommendationChecks, summarizeAccounts, type QuotaWindow } from './atelierData';
+import { summarizeAccounts, type QuotaWindow } from './atelierData';
+import { resetCountdown } from './dailyView';
 
 const number = (value: number) => new Intl.NumberFormat().format(value);
-function Ring({ value }: { value: number | null }) {
+function Allowance({ value, weekly = false }: { value: QuotaWindow | null; weekly?: boolean }) {
   return (
-    <svg className="atelier-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
-      <circle cx="18" cy="18" r="14" fill="none" stroke="#eeedf2" strokeWidth="4" />
-      <circle
-        cx="18"
-        cy="18"
-        r="14"
-        fill="none"
-        stroke="#c7b8e7"
-        strokeWidth="4"
-        strokeDasharray={`${(value ?? 0) * 0.88} 88`}
-        transform="rotate(-90 18 18)"
-        strokeLinecap="round"
-      />
-    </svg>
+    <div className={`atelier-allowance ${weekly ? 'weekly' : ''}`}>
+      <strong>{value ? `${Math.round(value.remaining)}%` : '—'}</strong>
+      {weekly && (
+        <div className="atelier-quota-track" aria-hidden="true">
+          <div style={{ width: `${value?.remaining ?? 0}%` }} />
+        </div>
+      )}
+    </div>
   );
 }
-function Allowance({ value }: { value: QuotaWindow | null }) {
+function ResetTime({ value, now }: { value: string | null; now: number }) {
+  const { t } = useTranslation();
+  const remaining = resetCountdown(value, now);
+  const exact = value
+    ? new Date(value).toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      })
+    : undefined;
+  const label =
+    remaining.kind === 'future'
+      ? remaining.days > 0
+        ? t('atelier.reset_days', remaining)
+        : remaining.hours > 0
+          ? t('atelier.reset_hours', remaining)
+          : t('atelier.reset_minutes', remaining)
+      : t(remaining.kind === 'due' ? 'atelier.reset_checking' : 'atelier.quota_not_reported');
   return (
-    <div className="atelier-allowance">
-      <Ring value={value?.remaining ?? null} />
-      <strong>{value ? `${Math.round(value.remaining)}%` : '—'}</strong>
-    </div>
+    <time className={`atelier-reset ${remaining.kind}`} dateTime={value ?? undefined} title={exact}>
+      <strong>{label}</strong>
+      {remaining.kind === 'future' && <small>{t('atelier.until_reset')}</small>}
+    </time>
   );
 }
 
 export function AtelierDashboard() {
   const { t } = useTranslation();
-  const { accounts, config, helper, quotas, observedAt, loading, query } = useAtelier();
+  const { accounts, quotas, observedAt, loading, query } = useAtelier();
   const [provider, setProvider] = useState('all');
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const names = useAccountNames((state) => state.names);
   const summary = summarizeAccounts(accounts);
-  const checks = recommendationChecks(config, accounts, helper);
   const claude = accounts.filter(
     (account) => (account.provider ?? account.type) === 'claude' && !account.disabled
   );
@@ -58,252 +77,157 @@ export function AtelierDashboard() {
       (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
       a.name.localeCompare(b.name)
   );
-  const nextReset = claude
-    .map((account) => quotas[account.name]?.weekly?.resetsAt)
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => Date.parse(a) - Date.parse(b))[0];
-  const allChecks = checks.filter((check) => check.state === 'on').length;
-  const providers = new Set(
-    accounts
-      .filter((account) => !account.disabled)
-      .map((account) => account.provider ?? account.type)
-  ).size;
+  const filtered = sorted.filter(
+    (account) =>
+      (provider === 'all' || (account.provider ?? account.type) === provider) &&
+      `${names[accountIdentity(account)] ?? ''} ${account.email ?? ''} ${account.name} ${account.provider ?? account.type}`
+        .toLowerCase()
+        .includes(query.toLowerCase())
+  );
   return (
     <div className="atelier-dashboard">
-      <section className="atelier-hero">
-        <div className="atelier-account-total">
-          <span className="atelier-eyebrow">{t('atelier.your_inference')}</span>
-          <div className="atelier-big-number">
-            {observedAt ? summary.active.toString().padStart(2, '0') : '—'}
-          </div>
-          <p>{t('atelier.connected_accounts')}</p>
-          <span className="atelier-muted">
-            {claude.length} Claude <span className="atelier-middle-dot">·</span>{' '}
-            {
-              accounts.filter(
-                (account) => (account.provider ?? account.type) === 'codex' && !account.disabled
-              ).length
-            }{' '}
-            Codex
-          </span>
+      <section className="atelier-overview">
+        <div>
+          <h2>{t('atelier.allowance_heading')}</h2>
+          <p>
+            {observedAt
+              ? t('atelier.accounts_connected', { count: summary.active })
+              : t('atelier.loading')}
+          </p>
         </div>
         <div className="atelier-capacity">
-          <div className="atelier-capacity-heading">
+          <div>
             <strong>{average === null ? '—' : `${Math.round(average)}%`}</strong>
             <span>{t('atelier.capacity_remaining')}</span>
-            <span className="atelier-live-label">
-              <i />
-              {t('atelier.live_quota')}
-            </span>
           </div>
-          <div className="atelier-spectrum">
-            <div className="atelier-spectrum-fill" style={{ width: `${average ?? 0}%` }} />
-            <span className="atelier-spectrum-caption">{t('atelier.weekly_allowance')}</span>
-            {average !== null && (
-              <span className="atelier-spectrum-marker" style={{ left: `${average}%` }} />
-            )}
+          <div className="atelier-spectrum" aria-hidden="true">
+            <div style={{ width: `${average ?? 0}%` }} />
           </div>
-          <div className="atelier-meter-note">
-            <span>{t('atelier.average_note')}</span>
-            <span>
-              {nextReset
-                ? `${t('atelier.next_reset')} ${new Date(nextReset).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                : t('atelier.reading_quota')}
-            </span>
-          </div>
+          <small>{t('atelier.average_note')}</small>
         </div>
       </section>
-      <section className="atelier-stats">
-        <div>
-          <span>{t('atelier.requests_served')}</span>
-          <div>
-            <span className="atelier-stat-symbol coral">↗</span>
-            <strong>{observedAt ? number(summary.total) : '—'}</strong>
-            <small>{t('atelier.since_start')}</small>
+      <section className="atelier-accounts-panel">
+        <div className="atelier-section-heading">
+          <h2>{t('atelier.your_accounts')}</h2>
+          <div className="atelier-segments" aria-label={t('atelier.filter_accounts')}>
+            {['all', 'claude', 'codex'].map((id) => (
+              <button
+                key={id}
+                aria-pressed={provider === id}
+                className={provider === id ? 'active' : ''}
+                onClick={() => setProvider(id)}
+              >
+                {id === 'all' ? t('atelier.all') : id === 'claude' ? 'Claude' : 'Codex'}
+              </button>
+            ))}
           </div>
         </div>
-        <div>
-          <span>{t('atelier.provider_pools')}</span>
-          <div>
-            <span className="atelier-stat-symbol lavender">≋</span>
-            <strong>{observedAt ? String(providers).padStart(2, '0') : '—'}</strong>
-            <small>
-              Claude <span className="atelier-middle-dot">·</span> Codex
-            </small>
-          </div>
+        <div className="atelier-account-columns">
+          <span>{t('atelier.account_label')}</span>
+          <span>{t('atelier.short_allowance')}</span>
+          <span>{t('atelier.weekly_allowance')}</span>
+          <span>{t('atelier.weekly_reset')}</span>
+          <span />
         </div>
-        <div>
-          <span>{t('atelier.success_rate')}</span>
-          <div>
-            <span className="atelier-stat-symbol mint">↑</span>
-            <strong>
-              {summary.successRate === null ? '—' : `${summary.successRate.toFixed(1)}%`}
-            </strong>
-            <small className="green">
-              {number(summary.success)} {t('atelier.successful')}
-            </small>
-          </div>
-        </div>
-      </section>
-      <section className="atelier-lower-grid">
-        <div className="atelier-accounts-panel">
-          <div className="atelier-section-heading">
-            <h2>{t('atelier.your_accounts')}</h2>
-            <span>
-              {accounts.length} {t('atelier.total')}
-            </span>
-            <div className="atelier-segments" aria-label={t('atelier.filter_accounts')}>
-              {['all', 'claude', 'codex'].map((id) => (
-                <button
-                  key={id}
-                  aria-pressed={provider === id}
-                  className={provider === id ? 'active' : ''}
-                  onClick={() => setProvider(id)}
-                >
-                  {id === 'all' ? t('atelier.all') : id === 'claude' ? 'Claude' : 'Codex'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="atelier-account-columns">
-            <span>{t('atelier.account')}</span>
-            <span>{t('atelier.five_hour')}</span>
-            <span>{t('atelier.weekly_left')}</span>
-            <span>{t('atelier.resets')}</span>
-          </div>
-          <div className="atelier-account-list">
-            {sorted
-              .filter(
-                (account) =>
-                  (provider === 'all' || (account.provider ?? account.type) === provider) &&
-                  `${names[accountIdentity(account)] ?? ''} ${account.email ?? ''} ${account.name} ${account.provider ?? account.type}`
-                    .toLowerCase()
-                    .includes(query.toLowerCase())
-              )
-              .map((account) => {
-                const kind = String(account.provider ?? account.type);
-                const quota = quotas[account.name];
-                const email = account.email || account.name;
-                const title =
-                  names[accountIdentity(account)] ??
-                  (kind === 'codex'
-                    ? t('atelier.chatgpt_pro')
-                    : email.endsWith('@alexandergrading.com')
-                      ? t('atelier.ag_workspace')
-                      : email.includes('@yahoo.')
-                        ? t('atelier.personal_yahoo')
-                        : t('atelier.personal_google'));
-                return (
-                  <div
-                    key={account.name}
-                    className="atelier-account-row"
-                    data-searchable={`${title} ${email} ${kind}`.toLowerCase()}
-                  >
-                    <div className="atelier-account-identity">
-                      <div className={`atelier-avatar ${kind}`} aria-hidden="true">
-                        {kind === 'codex' ? '◎' : '✳'}
-                      </div>
-                      <div>
-                        <strong>{title}</strong>
-                        <RenameAccountButton file={account} />
-                        <small title={email}>{email}</small>
-                      </div>
-                    </div>
-                    <Allowance value={quota?.short ?? null} />
-                    <Allowance value={quota?.weekly ?? null} />
-                    <div className="atelier-reset">
-                      <strong>
-                        {quota?.weekly?.resetsAt
-                          ? new Date(quota.weekly.resetsAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : '—'}
-                      </strong>
-                      <small>
-                        {quota?.error
-                          ? t('atelier.quota_unavailable')
-                          : quota?.weekly?.resetsAt
-                            ? new Date(quota.weekly.resetsAt).toLocaleTimeString(undefined, {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })
-                            : t('atelier.reading_quota')}
-                      </small>
-                    </div>
-                    <Link
-                      to="/auth-files"
-                      className="atelier-row-action"
-                      title={t('atelier.manage_account')}
-                      aria-label={`${t('atelier.manage_account')} ${title}`}
-                    >
-                      <Glyph name="arrow" size={17} />
-                    </Link>
+        <div className="atelier-account-list">
+          {filtered.map((account) => {
+            const kind = String(account.provider ?? account.type);
+            const quota = quotas[account.name];
+            const email = account.email || account.name;
+            const title =
+              names[accountIdentity(account)] ??
+              (kind === 'codex'
+                ? t('atelier.chatgpt_pro')
+                : kind !== 'claude'
+                  ? email
+                  : email.endsWith('@alexandergrading.com')
+                    ? t('atelier.ag_workspace')
+                    : email.includes('@yahoo.')
+                      ? t('atelier.personal_yahoo')
+                      : t('atelier.personal_google'));
+            return (
+              <div
+                key={account.name}
+                className={`atelier-account-row ${account.disabled ? 'disabled' : ''}`}
+              >
+                <div className="atelier-account-identity">
+                  <div className={`atelier-avatar ${kind}`} aria-hidden="true">
+                    {kind === 'codex'
+                      ? '◎'
+                      : kind === 'claude'
+                        ? '✳'
+                        : kind.slice(0, 1).toUpperCase()}
                   </div>
-                );
-              })}
-          </div>
-          {!accounts.length && (
-            <div className="atelier-empty">
-              {t(loading ? 'atelier.loading' : 'atelier.no_accounts')}
-            </div>
-          )}
-          <div className="atelier-table-foot">
-            <span>
-              <i />
-              {t('atelier.priority_note')}
-            </span>
-            <Link to="/quota">
-              {t('atelier.detailed_quota')} <Glyph name="arrow" size={15} />
-            </Link>
-          </div>
-        </div>
-        <aside className="atelier-setup-panel">
-          <div className="atelier-section-heading">
-            <h2>
-              {t(allChecks === checks.length ? 'atelier.running_smoothly' : 'atelier.setup_status')}
-            </h2>
-            <Link to="/setup" title={t('atelier.setup')} aria-label={t('atelier.setup')}>
-              <Glyph name="settings" size={20} />
-            </Link>
-          </div>
-          <div className="atelier-flower" aria-hidden="true">
-            <div className="atelier-flower-glow" />
-            {['affinity', 'websockets', 'priority', 'subagents', 'cooldown', 'strategy'].map(
-              (id, index) => (
-                <div key={id} className={`atelier-petal petal-${index}`}>
-                  <strong>
-                    {t(
-                      checks.find((check) => check.id === id)?.state === 'on'
-                        ? 'atelier.on'
-                        : 'atelier.check'
-                    )}
-                  </strong>
-                  <span>{t(`atelier.short_${id}`)}</span>
+                  <div>
+                    <div className="atelier-account-name">
+                      <strong title={title}>{title}</strong>
+                      <RenameAccountButton file={account} />
+                    </div>
+                    <small title={email}>{email}</small>
+                  </div>
                 </div>
-              )
+                <Allowance value={quota?.short ?? null} />
+                <Allowance value={quota?.weekly ?? null} weekly />
+                <ResetTime value={quota?.weekly?.resetsAt ?? null} now={now} />
+                <Link
+                  to="/auth-files"
+                  className="atelier-row-action"
+                  title={t('atelier.manage_account')}
+                  aria-label={`${t('atelier.manage_account')} ${title}`}
+                >
+                  <Glyph name="arrow" size={18} />
+                </Link>
+                {quota?.error && (
+                  <span className="atelier-quota-error" role="status">
+                    {t('atelier.quota_unavailable')}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {!filtered.length && (
+          <div className="atelier-empty">
+            {t(
+              loading
+                ? 'atelier.loading'
+                : accounts.length
+                  ? 'atelier.no_matches'
+                  : 'atelier.no_accounts'
             )}
-            <div className="atelier-flower-core">
-              <Glyph name="shield" size={20} />
-            </div>
           </div>
-          <div className="atelier-setup-caption">
-            <strong>
-              {allChecks} / {checks.length} {t('atelier.settings_verified')}
-            </strong>
-            <p>{t('atelier.safe_to_close')}</p>
-            <Link className="atelier-text-link" to="/setup">
-              {t('atelier.review_setup')} <Glyph name="arrow" size={16} />
-            </Link>
-          </div>
-        </aside>
+        )}
+        <div className="atelier-table-foot">
+          <span>{t('atelier.priority_note')}</span>
+          <Link to="/quota">
+            {t('atelier.detailed_quota')}
+            <Glyph name="arrow" size={16} />
+          </Link>
+        </div>
       </section>
-      <div className="atelier-observation-note">
-        {observedAt
-          ? `${t('atelier.updated')} ${observedAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-          : t('atelier.loading')}
-        <span>·</span>
-        {t('atelier.refresh_interval')}
+      <div className="atelier-dashboard-bottom">
+        <div className="atelier-observation-note">
+          {observedAt
+            ? `${t('atelier.updated')} ${observedAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+            : t('atelier.loading')}
+          <span>·</span>
+          {t('atelier.refresh_interval')}
+        </div>
+        <details className="atelier-traffic">
+          <summary>{t('atelier.request_activity')}</summary>
+          <div>
+            <span>
+              {t('atelier.requests_served')}
+              <strong>{observedAt ? number(summary.total) : '—'}</strong>
+            </span>
+            <span>
+              {t('atelier.success_rate')}
+              <strong>
+                {summary.successRate === null ? '—' : `${summary.successRate.toFixed(1)}%`}
+              </strong>
+            </span>
+          </div>
+        </details>
       </div>
     </div>
   );
