@@ -34,3 +34,8 @@ settings.local.json
 *.njsproj
 *.sln
 *.sw?
+
+# Personal desktop build outputs; never bundle keys or proxy config.
+native/ProxyAtelier.xcodeproj/
+.build/
+.artifacts/

@@ -1,5 +1,8 @@
 import { Navigate, useRoutes, type Location } from 'react-router-dom';
-import { DashboardPage } from '@/features/dashboard/DashboardPage';
+import { AtelierDashboard as DashboardPage } from '@/features/atelier/AtelierDashboard';
+import { AtelierSetup } from '@/features/atelier/AtelierSetup';
+import { DashboardPage as OriginalDashboardPage } from '@/features/dashboard/DashboardPage';
+import { useInterfaceStore } from '@/features/atelier/interfaceStore';
 import { ProvidersWorkbenchPage } from '@/features/providers/ProvidersWorkbenchPage';
 import { AuthFilesPage } from '@/features/authFiles/AuthFilesPage';
 import { AuthFilesOAuthExcludedEditPage } from '@/pages/AuthFilesOAuthExcludedEditPage';
@@ -15,9 +18,10 @@ import { LogsPage } from '@/features/logs/LogsPage';
 import { SystemPage } from '@/pages/SystemPage';
 import { useAuthStore } from '@/stores';
 
-const createMainRoutes = (supportsPlugin: boolean) => [
-  { path: '/', element: <DashboardPage /> },
-  { path: '/dashboard', element: <DashboardPage /> },
+const createMainRoutes = (supportsPlugin: boolean, original: boolean) => [
+  { path: '/', element: original ? <OriginalDashboardPage /> : <DashboardPage /> },
+  { path: '/dashboard', element: original ? <OriginalDashboardPage /> : <DashboardPage /> },
+  { path: '/setup', element: original ? <Navigate to="/config" replace /> : <AtelierSetup /> },
   { path: '/settings', element: <Navigate to="/config" replace /> },
   { path: '/api-keys', element: <Navigate to="/config" replace /> },
   { path: '/quick-start', element: <ProvidersWorkbenchPage fixedBrand="apikeyFun" /> },
@@ -50,5 +54,6 @@ const createMainRoutes = (supportsPlugin: boolean) => [
 
 export function MainRoutes({ location }: { location?: Location }) {
   const supportsPlugin = useAuthStore((state) => state.supportsPlugin);
-  return useRoutes(createMainRoutes(supportsPlugin), location);
+  const original = useInterfaceStore((state) => state.original);
+  return useRoutes(createMainRoutes(supportsPlugin, original), location);
 }

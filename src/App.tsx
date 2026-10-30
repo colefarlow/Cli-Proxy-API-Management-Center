@@ -4,7 +4,11 @@ import { LoginPage } from '@/pages/LoginPage';
 import { NotificationContainer } from '@/components/common/NotificationContainer';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { LoginRevealVeil } from '@/components/common/LoginRevealVeil';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { AtelierLayout as MainLayout } from '@/features/atelier/AtelierLayout';
+import { MainLayout as OriginalLayout } from '@/components/layout/MainLayout';
+import { useInterfaceStore } from '@/features/atelier/interfaceStore';
+import { useTranslation } from 'react-i18next';
+import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { ProtectedRoute } from '@/router/ProtectedRoute';
 import { useLanguageStore, useThemeStore } from '@/stores';
 
@@ -16,6 +20,24 @@ function RootShell() {
       <Outlet />
       <LoginRevealVeil />
     </>
+  );
+}
+
+function ManagementLayout() {
+  const original = useInterfaceStore((state) => state.original);
+  const { t } = useTranslation();
+  return original ? (
+    <>
+      <OriginalLayout />
+      <button
+        className="atelier-return"
+        onClick={() => useInterfaceStore.getState().setOriginal(false)}
+      >
+        {t('atelier.back_to_atelier')}
+      </button>
+    </>
+  ) : (
+    <MainLayout />
   );
 }
 
@@ -44,7 +66,7 @@ const router = createHashRouter([
         path: '/*',
         element: (
           <ProtectedRoute>
-            <MainLayout />
+            <ManagementLayout />
           </ProtectedRoute>
         ),
       },
@@ -53,6 +75,23 @@ const router = createHashRouter([
 ]);
 
 function App() {
+  const original = useInterfaceStore((state) => state.original);
+  useEffect(() => {
+    document.documentElement.dataset.atelierView = original ? 'original' : 'atelier';
+  }, [original]);
+  useEffect(() => {
+    const handler = (event: Event) =>
+      useInterfaceStore.getState().setOriginal(Boolean((event as CustomEvent).detail));
+    window.addEventListener('atelier-interface', handler);
+    return () => window.removeEventListener('atelier-interface', handler);
+  }, []);
+  useEffect(() => {
+    const handler = () => {
+      void triggerHeaderRefresh();
+    };
+    window.addEventListener('atelier-refresh', handler);
+    return () => window.removeEventListener('atelier-refresh', handler);
+  }, []);
   const initializeTheme = useThemeStore((state) => state.initializeTheme);
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);

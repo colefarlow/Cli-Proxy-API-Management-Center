@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 import '@/styles/global.scss';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import App from './App.tsx';
+import { DesktopEntry } from '@/features/atelier/DesktopEntry';
 
-document.title = 'CLI Proxy API Management Center';
+document.title = 'Proxy Atelier';
 document.documentElement.setAttribute('translate', 'no');
 document.documentElement.classList.add('notranslate');
 
@@ -22,6 +23,6 @@ if (faviconEl) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <DesktopEntry><App /></DesktopEntry>
   </StrictMode>
 );
